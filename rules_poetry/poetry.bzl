@@ -38,7 +38,7 @@ def _resolve_python_interpreter(rctx):
 
     return python_interpreter
 
-def _mapping(repository_ctx):
+def _mapping(repository_ctx, dev):
     python_interpreter = _resolve_python_interpreter(repository_ctx)
     result = repository_ctx.execute(
         [
@@ -65,15 +65,15 @@ def _mapping(repository_ctx):
             dep.lower(): "@%s//:library_%s" % (repository_ctx.name, _clean_name(dep))
             for dep in x.keys()
         }
-
-    dependencies = unpack_dependencies(pyproject["tool"]["poetry"]["dependencies"])
+    key = "dev-dependencies" if dev else "dependencies"
+    dependencies = unpack_dependencies(pyproject["tool"]["poetry"][key])
 
     groups = {}
 
     
     for k, v in pyproject["tool"]["poetry"].get("group", {}).items():
         groups.update({
-            k: unpack_dependencies(v["dependencies"])
+            k: unpack_dependencies(v[key])
         })
 
     return {
@@ -81,9 +81,11 @@ def _mapping(repository_ctx):
         "groups": groups,
     }
 
+
 def _impl(repository_ctx):
     python_interpreter = _resolve_python_interpreter(repository_ctx)
-    mapping = _mapping(repository_ctx)
+    mapping = _mapping(repository_ctx, False)
+    dev_mapping = _mapping(repository_ctx, True)
 
     result = repository_ctx.execute(
         [
@@ -154,6 +156,7 @@ def _impl(repository_ctx):
         "dependencies.bzl",
         """
 _mapping = {mapping}
+_dev_mapping = {dev_mapping}
 
 def dependency(name, group = None):
     if group:
@@ -168,6 +171,25 @@ def dependency(name, group = None):
         return dependencies[name]
 
     dependencies = _mapping["dependencies"]
+
+    if name not in dependencies:
+        fail("%s is not present in pyproject.toml" % name)
+
+    return dependencies[name]
+
+def dev_dependency(name, group = None):
+    if group:
+        if group not in _mapping["groups"]:
+            fail("%s is not a group in pyproject.toml" % name)
+
+        dependencies = _mapping["groups"][group]
+
+        if name not in dependencies:
+            fail("%s is not present in group %s in pyproject.toml" % (name, group))
+
+        return dependencies[name]
+
+    dependencies = _dev_mapping["dependencies"]
 
     if name not in dependencies:
         fail("%s is not present in pyproject.toml" % name)

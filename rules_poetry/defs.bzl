@@ -99,6 +99,28 @@ def _render_requirements(ctx):
 
     return destination
 
+
+def _render_dev_requirements(ctx):
+    destination = ctx.actions.declare_file("dev_requirements/%s.txt" % ctx.attr.name)
+    marker = ctx.attr.marker
+    if marker:
+        marker = "; " + marker
+
+    content = "{name}=={version} {hashes} {marker}".format(
+        name = ctx.attr.pkg,
+        version = ctx.attr.version,
+        hashes = " ".join(["--hash=" + h for h in ctx.attr.hashes]),
+        marker = marker,
+    )
+    ctx.actions.write(
+        output = destination,
+        content = content,
+        is_executable = False,
+    )
+
+    return destination
+
+
 COMMON_ARGS = [
     "--quiet",
     "--no-deps",
@@ -161,6 +183,7 @@ def _download(ctx, requirements):
 
 def _download_wheel_impl(ctx):
     requirements = _render_requirements(ctx)
+    dev_requirements = _render_dev_requirements(ctx)
     wheel_directory = _download(ctx, requirements)
 
     return [
