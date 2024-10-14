@@ -4,21 +4,32 @@ workspace(
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
+# Bazel Python rules (https://github.com/bazelbuild/rules_python/releases)
+# Note that we purposedly use an older version than latest, as release 0.28.0 drops Bazel 5 compatibility.
+SHA="a5640fddd4beb03e8c1fde5ed7160c0ba6bd477e7d048661c30c06936a26fd63"
+VERSION="0.22.1"
+
 http_archive(
     name = "rules_python",
-    sha256 = "8c8fe44ef0a9afc256d1e75ad5f448bb59b81aba149b8958f02f7b3a98f5d9b4",
-    strip_prefix = "rules_python-0.13.0",
-    url = "https://github.com/bazelbuild/rules_python/archive/refs/tags/0.13.0.tar.gz",
+    sha256 = SHA,
+    strip_prefix = "rules_python-{}".format(VERSION),
+    url = "https://github.com/bazelbuild/rules_python/releases/download/{}/rules_python-{}.tar.gz".format(VERSION,VERSION),
 )
 
-load("@rules_python//python:repositories.bzl", "python_register_toolchains")
+load("@rules_python//python:repositories.bzl", "py_repositories", "python_register_toolchains")
+py_repositories()
 
+# Python toolchain
+load("@rules_python//python:versions.bzl", "MINOR_MAPPING")
 python_register_toolchains(
-    name = "rules_poetry_python3_10",
-    python_version = "3.10",
+    name = "python_3_11",
+    ignore_root_user_error = True,  # avoids error in Gitlab jobs
+    python_version = MINOR_MAPPING["3.11"],
 )
 
-load("@rules_poetry_python3_10//:defs.bzl", python_interpreter = "interpreter")
+# Pip rules
+load("@rules_python//python:pip.bzl", "pip_parse")
+load("@python_3_11//:defs.bzl", python_interpreter = "interpreter")
 
 # install pip and setuptools locally
 load("@com_sonia_rules_poetry//rules_poetry:defs.bzl", "poetry_deps")
@@ -65,15 +76,15 @@ load("@io_bazel_rules_docker//repositories:deps.bzl", _container_deps = "deps")
 
 _container_deps()
 
-
-
-# Split remarshal out, most consumers will not need it
-local_repository(
-    name = "remarshal",
-    path = "remarshal",
+pip_parse(
+    name = "remarshal_deps",
+    requirements = "//tools:requirements.txt",
+    python_interpreter_target = python_interpreter,
 )
 
+load("@remarshal_deps//:requirements.bzl", remarshal_install_deps = "install_deps")
 
+remarshal_install_deps()
 
 # Poetry rules
 load("//rules_poetry:poetry.bzl", "poetry")
