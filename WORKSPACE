@@ -78,7 +78,7 @@ _container_deps()
 
 pip_parse(
     name = "remarshal_deps",
-    requirements = "@remarshal//:requirements.txt",
+    requirements = "//tools:requirements.txt",
     python_interpreter_target = python_interpreter,
 )
 
