@@ -278,7 +278,7 @@ poetry = repository_rule(
         ),
         "_script": attr.label(
             executable = True,
-            default = "//tools:remarshal.par",
+            default = "//tools:remarshal",
             cfg = "exec",
         ),
     },
